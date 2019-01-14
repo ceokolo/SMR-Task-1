@@ -4,11 +4,11 @@ import sys
 import os
 import re
 
-
 class FunctionChangeObserver():
     def __init__(self, repository):
         dir_array = repository.split('/')
         dir_name = dir_array[len(dir_array) - 1]
+        self.functional_regex = re.compile("(public|protected|private|static|\s) +[\w\<\>\[\]]+\s+(\w+) *\([^\)]*\) *(\{?|[^;])")
         self.csv_dict = {
             "Commit SHA": [],
             "Java File": [],
@@ -35,7 +35,6 @@ class FunctionChangeObserver():
             new_commit = all_commits[index]
             modified_diff = self.get_modified_commit_diff(old_commit, new_commit)
             if modified_diff is not None and len(modified_diff) > 0:
-                print(modified_diff)
                 functional_diff = self.get_functional_changes(modified_diff)
                 if len(functional_diff) > 0:
                     self.add_to_csv(functional_diff, new_commit.hexsha)
@@ -90,8 +89,10 @@ class FunctionChangeObserver():
             for index in range(0, len(diff_dict[file_name]), 2):
                 deletion = diff_dict[file_name][index]
                 addition = diff_dict[file_name][index + 1]
-                is_function = re.match('\sfunction\s\w+\(', deletion) and re.match('\sfunction\s\w+\(', addition)
+                is_function = self.functional_regex.search(deletion) and self.functional_regex.search(addition)
                 if is_function and len(deletion.split(',')) < len(addition.split(',')):
+                    print(addition)
+                    print(deletion)
                     if file_name in new_dict:
                         new_dict[file_name].append(deletion)
                         new_dict[file_name].append(addition)
@@ -109,7 +110,7 @@ class FunctionChangeObserver():
                 self.csv_dict["Commit SHA"].append(commit_hash)
                 self.csv_dict["Java File"].append(file_name)
                 self.csv_dict["Old Function Signature"].append(old_signature)
-                self.csv_dict["New Function Signature"].append(new)
+                self.csv_dict["New Function Signature"].append(new_signature)
 
     def get_function_signature(self, change):
         index_of_the_string_function = change.find('function')
