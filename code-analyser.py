@@ -17,12 +17,10 @@ class FunctionChangeObserver():
         }
         if os.path.isdir(dir_name):
             self.repo = Repo(dir_name + '/.git')
-            print(list(self.repo.iter_commits('master')))
         else:
             repo = Repo('.git')
             repo.git.clone(repository)
             self.repo = Repo(dir_name + '/.git')
-            print(list(self.repo.iter_commits('master')))
 
     def get_all_commits(self):
         all_commits = list(self.repo.iter_commits('master'))
@@ -30,15 +28,14 @@ class FunctionChangeObserver():
 
     def process_all_commits(self):
         all_commits = self.get_all_commits()
-        for index in range(len(all_commits) - 1):
-            old_commit = all_commits[index+1]
+        for index in reversed(range(1, len(all_commits))):
+            old_commit = all_commits[index-1]
             new_commit = all_commits[index]
             modified_diff = self.get_modified_commit_diff(old_commit, new_commit)
             if modified_diff is not None and len(modified_diff) > 0:
                 functional_diff = self.get_functional_changes(modified_diff)
                 if len(functional_diff) > 0:
                     self.add_to_csv(functional_diff, new_commit.hexsha)
-            print("======================================================\n")
         df = pd.DataFrame(self.csv_dict)
         df.to_csv('data.csv', index=None)
 
@@ -90,9 +87,7 @@ class FunctionChangeObserver():
                 deletion = diff_dict[file_name][index]
                 addition = diff_dict[file_name][index + 1]
                 is_function = self.functional_regex.search(deletion) and self.functional_regex.search(addition)
-                if is_function and len(deletion.split(',')) < len(addition.split(',')):
-                    print(addition)
-                    print(deletion)
+                if is_function is not None and len(deletion.split(',')) < len(addition.split(',')):
                     if file_name in new_dict:
                         new_dict[file_name].append(deletion)
                         new_dict[file_name].append(addition)
@@ -113,9 +108,8 @@ class FunctionChangeObserver():
                 self.csv_dict["New Function Signature"].append(new_signature)
 
     def get_function_signature(self, change):
-        index_of_the_string_function = change.find('function')
-        index_of_bracket_end = change.find(')')
-        signature = change[index_of_the_string_function + 8, index_of_bracket_end + 1]
+        find = re.search('\s+\w+\([^\)]*\)*', change)
+        signature = find.group(0)
         return signature.strip()
 
 
